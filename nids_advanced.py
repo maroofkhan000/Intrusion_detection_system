@@ -11,6 +11,7 @@ from colorama import Fore, Style, init
 import argparse
 import json
 from datetime import datetime
+import subprocess
 import sys
 import os
 import signal
@@ -55,7 +56,9 @@ class AdvancedNIDS:
         self.bpf = bpf
         self.dry_run = dry_run
         self.log_file = log_file
-        self.promiscuous = promiscuous  # Monitor ALL network traffic
+        self.promiscuous = promiscuous
+        self.ips_mode = False  # Intrusion Prevention (Blocking)
+        self.blocked_ips = set()
 
         try:
             self.local_ip = get_if_addr(iface)
@@ -156,6 +159,40 @@ class AdvancedNIDS:
                     "details": details
                 }
                 f.write(json.dumps(log_entry) + "\n")
+
+        # Active Blocking (IPS Mode)
+        if self.ips_mode and severity in ["high", "critical"]:
+            self.block_ip(src)
+
+    # ================= IPS BLOCKING LOGIC =================
+    def block_ip(self, ip):
+        """Temporarily block an IP address using iptables"""
+        if ip == "N/A" or ip == self.local_ip or ip == self.gateway_ip:
+            return
+
+        if ip in self.blocked_ips:
+            return
+
+        print(f"{C['critical']}[!] IPS: Blocking {ip} for 60 seconds...{C['rst']}")
+        try:
+            # Block the IP
+            subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"], check=True)
+            self.blocked_ips.add(ip)
+
+            # Schedule unblock
+            threading.Timer(60, self.unblock_ip, [ip]).start()
+        except Exception as e:
+            print(f"[!] IPS Error: Could not block {ip}. Ensure you have sudo permissions.")
+
+    def unblock_ip(self, ip):
+        """Remove the block from an IP address"""
+        print(f"{C['info']}[*] IPS: Unblocking {ip}...{C['rst']}")
+        try:
+            subprocess.run(["sudo", "iptables", "-D", "INPUT", "-s", ip, "-j", "DROP"], check=True)
+            if ip in self.blocked_ips:
+                self.blocked_ips.remove(ip)
+        except:
+            pass
 
     # ================= TCP FLAG ANALYSIS =================
     def analyze_tcp_flags(self, pkt, src, dst):
@@ -433,6 +470,8 @@ class AdvancedNIDS:
         print(f"    - ICMP Floods")
         print(f"    - DNS Tunneling")
         print(f"    - Service Detection")
+        if self.ips_mode:
+            print(f"    - IPS Blocking: ENABLED (Auto-block for 60s)")
         if self.target_ip:
             print(f"    - Active Redirection: ON (Monitoring {self.target_ip})")
         print(f"\n{C['info']}[*] Monitoring started...{C['rst']}\n")
@@ -487,6 +526,7 @@ Examples:
     parser.add_argument("--promiscuous", action="store_true", help="Enable promiscuous mode (monitor all network traffic)")
     parser.add_argument("--target-ip", help="IP of a specific machine to monitor (Active Redirection)")
     parser.add_argument("--gateway-ip", help="IP of the Router/Gateway (Required for --target-ip)")
+    parser.add_argument("--ips", action="store_true", help="Enable IPS mode (Auto-block attacking IPs)")
 
     args = parser.parse_args()
     
@@ -499,6 +539,11 @@ Examples:
     try:
         nids = AdvancedNIDS(args.iface, args.bpf, args.dry_run, args.log_file, args.promiscuous)
         
+        # Configure IPS
+        if args.ips:
+            nids.ips_mode = True
+            # Flush any old custom rules if needed (optional)
+            
         # Start Active Redirection if requested
         if args.target_ip:
             nids.target_ip = args.target_ip

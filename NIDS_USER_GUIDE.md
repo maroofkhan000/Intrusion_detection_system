@@ -20,6 +20,16 @@ Run the script and tell it who to watch:
 ```bash
 sudo python3 nids_advanced.py --iface wlan0 --target-ip 192.168.0.181 --gateway-ip 192.168.0.1
 ```
+
+---
+
+### Step 5: Enable Active Blocking (IPS Mode)
+To automatically block attackers for 60 seconds, add the `--ips` flag:
+```bash
+sudo python3 nids_advanced.py --iface wlan0 --ips
+```
+*   **Action:** When a threat is detected, the NIDS uses `iptables` to block the attacking IP.
+*   **Protection:** Your Local IP and Gateway are automatically excluded from being blocked.
 *   **Target IP:** The IP of the Windows machine.
 *   **Gateway IP:** The IP of your Router.
 
@@ -38,6 +48,7 @@ Check your Kali screen for alerts. It will automatically detect:
 *   **Port Scanning** (Finding open ports)
 *   **SYN Flooding** (Crashing a service)
 *   **Malicious Payloads** (Hackers sending bad commands)
+*   **Active Blocking** (IPS mode - automatically dropping attacker packets)
 
 ---
 
