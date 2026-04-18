@@ -1,5 +1,5 @@
 # Simple NIDS Guide
-
+## In linux based system it is easy to use this ids system 
 ### Step 0: Virtual Machine Setup
 Before starting, your Virtual Machine (Kali) must be configured to "talk" to the real world:
 1.  **Bridged Mode:** In VM Settings -> Network, set Adapter to **Bridged**. This gives Kali its own IP address on your home WiFi.
